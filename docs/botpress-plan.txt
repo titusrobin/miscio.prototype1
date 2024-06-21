@@ -1,0 +1,17 @@
+Prototype using botpress flow:
+
+1. Connect with Robin's Whatsapp number 
+2. Have a greeting message on behalf of Sarah (menu: create a campaign for 'end of semester feedback' to all MIDS cohort)
+    - 'Hi, this is Sarah's representative, your response is needed on the program evaluation survey. 
+    Please let me know when you have 5 minutes on your hands'
+     - The survey is due by April 2, 2024
+    
+    - A few notes: The purpose of this survey is to improve the overall MIDS expereience, and essential to 
+    understanding how MIDS would be improved for you and future students' 
+    - (Other notes) 
+
+3. Robin is ready 
+4. Ask three questions and get answers and store them in MongoDB
+5. Clustering and modelling analysis 
+    Send a scorecard analysis by email to whomever. 
+6. Present an output in natural language for now. (Use ChatGPT for a simple dashboard for now? - Anyone to flag?)

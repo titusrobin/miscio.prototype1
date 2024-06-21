@@ -1,0 +1,9 @@
+Session state is a way to store information that should 
+persist across user interactions in a Streamlit app. 
+
+Handles: Auth status, form input values and data to be stored in session_state
+- It is a python object. When frontend maintains connection to the backend. 
+- State is storing states for later runs. 
+- How do keys work? 
+    Accessing keys as you would a dict. 
+    What's an onclick. 
