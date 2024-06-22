@@ -1,0 +1,7 @@
+utils setup:
+- Setting up client, connecting db and collection. 
+- Save thread function to store in chat_collection 
+- Retreive function also setup there
+
+Login setup: 
+- The upsert=True option means that if the document does not exist, it will be created.
