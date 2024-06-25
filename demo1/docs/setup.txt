@@ -16,3 +16,8 @@ Chat.py
 - Chat prompt ideas if state: Uninitiated (Element451)
 - Chatbox 
 - Integrate/Add database? For analysis? 
+
+Func Call Plan:
+- Listening for task: run a campaign in any form. 
+    - collect campaign information 
+    - reach out to students with generic note from mongodb students db 
