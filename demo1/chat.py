@@ -1,11 +1,14 @@
 # Dependencies 
 import streamlit as st
 import openai
+from dotenv import load_dotenv
+import os
 from datetime import datetime
-from utils import assistant, save_message, get_chathistory, users_collection, run_campaign
+from utils import save_message, get_chathistory, users_collection, run_campaign
 from utils import openai_client as client
+load_dotenv()
+OPENAI_ASSISTANT_ID = os.getenv("OPENAI_ASSISTANT_ID")
 
-# Run thread 
 def get_response(message):
     if "thread_id" not in st.session_state or not st.session_state.thread_id:
         thread = client.beta.threads.create()
@@ -32,7 +35,7 @@ def get_response(message):
 
         run = client.beta.threads.runs.create(
             thread_id=st.session_state.thread_id,
-            assistant_id=assistant.id,
+            assistant_id=OPENAI_ASSISTANT_ID,
             instructions=f"Please address the user as Miscio Admin. They are the admin to whom you are the assistant at Miscio. The user asked: {message}"
         )
 
@@ -47,7 +50,6 @@ def get_response(message):
 
         for tool in tool_calls:
             if tool.function.name == "run_campaign":
-                print("Running campaign...")
                 run_campaign()
                 tool_outputs.append({"tool_call_id": tool.id, "output": "Campaign run successfully"})
 
