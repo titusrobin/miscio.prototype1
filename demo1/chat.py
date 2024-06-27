@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 from utils import save_message, get_chathistory, users_collection, run_campaign
 from utils import openai_client as client
+
 load_dotenv()
 OPENAI_ASSISTANT_ID = os.getenv("OPENAI_ASSISTANT_ID")
 
@@ -50,8 +51,9 @@ def get_response(message):
 
         for tool in tool_calls:
             if tool.function.name == "run_campaign":
-                run_campaign()
-                tool_outputs.append({"tool_call_id": tool.id, "output": "Campaign run successfully"})
+                campaign_description = message  # Use the message as the campaign description
+                assistant_id = run_campaign(campaign_description)
+                tool_outputs.append({"tool_call_id": tool.id, "output": f"Campaign run successfully with assistant ID: {assistant_id}"})
 
         client.beta.threads.runs.submit_tool_outputs(
             thread_id=st.session_state.thread_id,
