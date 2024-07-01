@@ -1,5 +1,7 @@
-streamlit 
-openai 
-python-dotenv 
+streamlit
 pymongo
+python-dotenv
+openai
+flask
 twilio
+pyngrok
