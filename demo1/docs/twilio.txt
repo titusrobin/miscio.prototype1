@@ -1,0 +1,7 @@
+INTRO
+- TwiML (the Twilio Markup Language) is a set of instructions you can use to tell 
+Twilio what to do when you receive an incoming call, SMS, MMS, or WhatsApp message.
+
+- When a message arrives at your Twilio phone number, 
+Twilio sends a request to your web application using the webhook URL that you've specified. 
+

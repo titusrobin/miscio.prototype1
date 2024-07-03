@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-OpenAI.api_key = os.getenv('OPENAI_API_KEY')
+OpenAI.api_key = os.getenv("OPENAI_API_KEY")
 openai_client = OpenAI()
 
 # Create the assistant
@@ -24,15 +24,16 @@ assistant = openai_client.beta.assistants.create(
                         "campaign_type": {
                             "type": "string",
                             "description": "The type of campaign to run.",
-                            "enum": ["generic"]
+                            "enum": ["generic"],
                         }
                     },
-                    "required": ["campaign_type"]
-                }
-            }
+                    "required": ["campaign_type"],
+                },
+            },
         }
-    ]
+    ],
 )
 
 # Print the assistant ID
 print("Assistant ID:", assistant.id)
+
