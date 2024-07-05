@@ -98,7 +98,7 @@ def send_initial_message(contact, campaign_description, thread_id, assistant_id)
     )
 
 def authenticate_user(username, password):
-    return username == "admin" and password == "password"
+    return username == "admin" and password == "Miscio@dm1n"
 
 def get_openai_response(message):
     if "thread_id" not in st.session_state or not st.session_state.thread_id:

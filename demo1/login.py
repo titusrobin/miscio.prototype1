@@ -6,7 +6,7 @@ from utils import create_new_thread, users_collection, authenticate_user, misio_
 def login_page():
     st.image(misio_logo, width=150)
     
-    username = st.text_input("Email")
+    username = st.text_input("Username")
     password = st.text_input("Password", type="password")
     
     if st.button("Login"):

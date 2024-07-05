@@ -1,13 +1,20 @@
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
-from utils import openai_client, campaigns_collection, students_collection, send_student_message
+from utils import (
+    openai_client,
+    campaigns_collection,
+    students_collection,
+    send_student_message,
+)
 
 app = Flask(__name__)
+
 
 @app.route("/")
 def home():
     """Home endpoint returning a simple message."""
     return "Home"
+
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -61,6 +68,7 @@ def webhook():
     send_student_message(sender, assistant_message)
 
     return str(MessagingResponse())
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5002)

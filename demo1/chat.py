@@ -1,5 +1,5 @@
 # Dependencies 
-import streamlit as st, os, openai
+import streamlit as st, os
 from datetime import datetime
 from utils import save_message, get_chathistory, users_collection, run_campaign, get_openai_response
 
