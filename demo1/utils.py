@@ -10,6 +10,8 @@ OpenAI.api_key = os.getenv('OPENAI_API_KEY')
 openai_client = OpenAI()
 
 misio_logo = '/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/m3logo.jpg'
+chat_logo = '/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/misciologo.jpg'
+icon = '/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/a.jpg'
 
 mongo_client = MongoClient(os.getenv('MONGO_URI'))
 db = mongo_client.get_database("MiscioP1")
