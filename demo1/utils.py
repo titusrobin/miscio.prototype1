@@ -100,7 +100,7 @@ def send_initial_message(contact, campaign_description, thread_id, assistant_id)
     )
 
 def authenticate_user(username, password):
-    return username == "admin" and password == "Miscio@dm1n"
+    return username == "admin" and password == "admin123//"
 
 def get_openai_response(message):
     if "thread_id" not in st.session_state or not st.session_state.thread_id:
@@ -146,3 +146,6 @@ def get_openai_response(message):
             return content
 
     return "I'm sorry, I couldn't process your request at this time."
+
+
+

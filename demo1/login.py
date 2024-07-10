@@ -24,13 +24,15 @@ def login_page():
                     st.session_state.thread_id = thread_id
                 else:
                     st.session_state.thread_id = user.get("thread_id")
+
+                st.experimental_rerun()
             else:
                 st.error("Invalid credentials. Please try again.")
 
         st.markdown("*Don't have an account? [Sign Up](#)*")
 
-# CSS and JavaScript for dynamic button and input field styling
-st.markdown("""
+    # CSS for styling
+    st.markdown("""
     <style>
     .stButton>button {
         color: white;
@@ -61,26 +63,4 @@ st.markdown("""
         box-shadow: 0 0 0 1px #14438E !important;
     }
     </style>
-    
-    <script>
-    const buttons = window.parent.document.querySelectorAll('.stButton > button');
-    buttons.forEach(button => {
-        button.addEventListener('mouseenter', function() {
-            this.style.backgroundColor = '#14438E';
-            this.style.color = 'white';
-        });
-        button.addEventListener('mouseleave', function() {
-            this.style.backgroundColor = '#1A73E8';
-            this.style.color = 'white';
-        });
-        button.addEventListener('mousedown', function() {
-            this.style.backgroundColor = '#0f1535';
-            this.style.color = 'white';
-        });
-        button.addEventListener('mouseup', function() {
-            this.style.backgroundColor = '#1A73E8';
-            this.style.color = 'white';
-        });
-    });
-    </script>
     """, unsafe_allow_html=True)
