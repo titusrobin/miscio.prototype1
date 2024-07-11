@@ -1,6 +1,6 @@
 import streamlit as st
 import base64
-from utils import save_message, get_chathistory, get_openai_response, chat_logo, icon
+from utils import save_message, get_chathistory, get_openai_response, chat_logo, icon, user_avatar, assistant_avatar
 
 def img_to_base64(img_path):
     with open(img_path, "rb") as image_file:
@@ -10,10 +10,14 @@ def chat_interface():
     try:
         logo_base64 = img_to_base64(chat_logo)
         icon_base64 = img_to_base64(icon)
+        user_avatar_base64 = img_to_base64(user_avatar)
+        assistant_avatar_base64 = img_to_base64(assistant_avatar)
     except Exception as e:
         st.error(f"Error loading images: {str(e)}")
         logo_base64 = ""
         icon_base64 = ""
+        user_avatar_base64 = ""
+        assistant_avatar_base64 = ""
 
     # Custom CSS for header bar and chat container
     st.markdown(
@@ -40,7 +44,7 @@ def chat_interface():
             height: 40px;
         }}
         .upload-icon {{
-            height: 30px;
+            height: 40px;
             cursor: pointer;
         }}
         .chat-container {{
@@ -74,8 +78,8 @@ def chat_interface():
     # Display chat messages
     with st.container():
         st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-        for message in st.session_state.messages[-5:]:  # Display only the last 5 messages
-            with st.chat_message(message["role"]):
+        for message in st.session_state.messages:  # Display all messages
+            with st.chat_message(message["role"], avatar=user_avatar if message["role"] == "user" else assistant_avatar):
                 st.markdown(message["content"])
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -84,11 +88,11 @@ def chat_interface():
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
         # Display user message
-        with st.chat_message("user"):
+        with st.chat_message("user", avatar=user_avatar):
             st.markdown(prompt)
 
         # Get and display assistant response
-        with st.chat_message("assistant"):
+        with st.chat_message("assistant", avatar=assistant_avatar):
             response = get_openai_response(prompt)
             st.markdown(response)
 

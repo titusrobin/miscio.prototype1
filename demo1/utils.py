@@ -12,6 +12,8 @@ openai_client = OpenAI()
 misio_logo = '/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/m3logo.jpg'
 chat_logo = '/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/misciologo.jpg'
 icon = '/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/a.jpg'
+assistant_avatar='/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/miscio_agent.jpg'
+user_avatar = '/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/user_icon.jpg'
 
 mongo_client = MongoClient(os.getenv('MONGO_URI'))
 db = mongo_client.get_database("MiscioP1")
@@ -119,7 +121,7 @@ def get_openai_response(message):
         thread_id=st.session_state.thread_id,
         assistant_id=os.getenv('OPENAI_ASSISTANT_ID'),
         instructions=f"Please address the user as Miscio Admin. They are the admin to whom you are the assistant at Miscio. The user asked: {message}"
-    )
+    ) 
     run = openai_client.beta.threads.runs.retrieve(thread_id=st.session_state.thread_id, run_id=run.id)
     
     while run.status != "completed":
