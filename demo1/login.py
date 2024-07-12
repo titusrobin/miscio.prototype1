@@ -1,38 +1,52 @@
+# Dependencies
 import streamlit as st
 from utils import create_new_thread, users_collection, authenticate_user, misio_logo
 
-def login_page(): 
-    col1, col2, col3 = st.columns([1, 2, 1])
+
+def login_page():
+    col1, col2, col3 = st.columns([1, 2, 1])  # Fit window to center
 
     with col2:
         st.image(misio_logo, width=100, use_column_width=True)
-        st.markdown("<h1 style='text-align: center;'>Welcome back</h1>", unsafe_allow_html=True)
-        
+        st.markdown(
+            "<h1 style='text-align: center;'>Welcome back</h1>", unsafe_allow_html=True
+        )
+
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
-        
+
         if st.button("Login", key="login_button"):
-            if authenticate_user(username, password):
+            if authenticate_user(username, password):  # Authwall for demo
                 st.session_state.logged_in = True
                 st.session_state.username = username
-                
+
                 user = users_collection.find_one({"username": username})
-                
+
                 if not user:
                     thread_id = create_new_thread()
-                    users_collection.insert_one({"username": username, "thread_id": thread_id})
+                    users_collection.insert_one(
+                        {"username": username, "thread_id": thread_id}
+                    )  # Create a new thread per user
                     st.session_state.thread_id = thread_id
                 else:
                     st.session_state.thread_id = user.get("thread_id")
+                    if not st.session_state.thread_id:
+                        # This handles the case where a user exists but doesn't have a thread_id
+                        thread_id = create_new_thread()
+                        users_collection.update_one(
+                            {"username": username}, {"$set": {"thread_id": thread_id}}
+                        )
+                        st.session_state.thread_id = thread_id
 
-                st.experimental_rerun()
+                st.experimental_rerun()  # State history update and Loading
             else:
                 st.error("Invalid credentials. Please try again.")
 
         st.markdown("*Don't have an account? [Sign Up](#)*")
 
     # CSS for styling
-    st.markdown("""
+    st.markdown(
+        """
     <style>
     .stButton>button {
         color: white;
@@ -63,4 +77,6 @@ def login_page():
         box-shadow: 0 0 0 1px #14438E !important;
     }
     </style>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )

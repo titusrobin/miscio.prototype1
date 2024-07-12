@@ -1,3 +1,45 @@
+Current History Managment 
+
+A. User collection
+- Each user has a unique document in collection. 
+- Each user gets their own thread id. 
+
+B. Chat collection (DOES THIS NEEDS TO CHANGE TO ADMIN CHAT?)
+- Stores thread_id and chat message by assistant/user. 
+
+
+
+
+### Admin's perspective:
+- My user account information is saved
+- My chat history with my assistant is saved (OPENAI HOSTS HISTORY - LOC EG)
+- Student campaigns I run need to be stored individually 
+- I want access to student chat history
+
+>> I want the campaigning threads and student chat history stored - need a schema for this. 
+    (Can we not use a new assistant with an existing thread?)
+    (How to store campaign specific history into the same thread): student assistant v student thread 
+>> Initial message needs to be changed (history basis)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+----
 utils setup:
 - Setting up client, connecting db and collection. 
 - Save thread function to store in chat_collection 

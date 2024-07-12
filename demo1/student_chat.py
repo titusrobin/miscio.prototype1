@@ -1,3 +1,4 @@
+# Dependencies 
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 from utils import (
@@ -7,6 +8,7 @@ from utils import (
     send_student_message,
 )
 
+# Create a Flask app
 app = Flask(__name__)
 
 
@@ -15,8 +17,9 @@ def home():
     """Home endpoint returning a simple message."""
     return "Home"
 
-
 @app.route("/webhook", methods=["POST"])
+
+# Webhook endpoint: Receiver
 def webhook():
     incoming_msg = request.values.get("Body", "").lower()
     sender = request.values.get("From")
