@@ -2,8 +2,8 @@
 import streamlit as st
 import base64
 from utils import (
-    save_message,
-    get_chathistory,
+    save_admin_message,
+    get_admin_chathistory,
     get_openai_response,
     chat_logo,
     icon,
@@ -11,12 +11,10 @@ from utils import (
     assistant_avatar,
 )
 
-
 # Loading images
 def img_to_base64(img_path):
     with open(img_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode()
-
 
 def chat_interface():
     try:
@@ -76,7 +74,7 @@ def chat_interface():
 
     # Load chat history
     if "thread_id" in st.session_state and st.session_state.thread_id:
-        chat_history = get_chathistory(st.session_state.thread_id)
+        chat_history = get_admin_chathistory(st.session_state.thread_id)
         if chat_history:
             st.session_state.messages = chat_history
 
@@ -88,15 +86,11 @@ def chat_interface():
                 message["role"],
                 avatar=user_avatar if message["role"] == "user" else assistant_avatar,
             ):
-                st.markdown(message["message"])  # Change "content" to "message"
+                st.markdown(message["message"])
         st.markdown("</div>", unsafe_allow_html=True)
 
     # Chat input
     if prompt := st.chat_input("Type your message..."):
-        # Add user message to chat history
-        st.session_state.messages.append(
-            {"role": "user", "message": prompt}
-        )  # Change "content" to "message"
         # Display user message
         with st.chat_message("user", avatar=user_avatar):
             st.markdown(prompt)
@@ -106,15 +100,11 @@ def chat_interface():
             response = get_openai_response(prompt)
             st.markdown(response)
 
-        # Add assistant response to chat history
-        st.session_state.messages.append(
+        # Add messages to chat history (but don't save to database here)
+        st.session_state.messages.extend([
+            {"role": "user", "message": prompt},
             {"role": "assistant", "message": response}
-        )  # Change "content" to "message"
-
-        # Save messages to database
-        #save_message(st.session_state.thread_id, "user", prompt)
-        #save_message(st.session_state.thread_id, "assistant", response)
-
+        ])
 
 if __name__ == "__main__":
     chat_interface()

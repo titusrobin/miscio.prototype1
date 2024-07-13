@@ -16,10 +16,7 @@ B. Chat collection (DOES THIS NEEDS TO CHANGE TO ADMIN CHAT?)
 - Student campaigns I run need to be stored individually 
 - I want access to student chat history
 
->> I want the campaigning threads and student chat history stored - need a schema for this. 
-    (Can we not use a new assistant with an existing thread?)
-    (How to store campaign specific history into the same thread): student assistant v student thread 
->> Initial message needs to be changed (history basis)
+>> 
 
 
 

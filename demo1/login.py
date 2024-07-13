@@ -1,6 +1,6 @@
 # Dependencies
 import streamlit as st
-from utils import create_new_thread, users_collection, authenticate_user, misio_logo
+from utils import create_new_thread, admin_users_collection, authenticate_user, misio_logo
 
 
 def login_page():
@@ -20,11 +20,11 @@ def login_page():
                 st.session_state.logged_in = True
                 st.session_state.username = username
 
-                user = users_collection.find_one({"username": username})
+                user = admin_users_collection.find_one({"username": username})
 
                 if not user:
                     thread_id = create_new_thread()
-                    users_collection.insert_one(
+                    admin_users_collection.insert_one(
                         {"username": username, "thread_id": thread_id}
                     )  # Create a new thread per user
                     st.session_state.thread_id = thread_id
@@ -33,7 +33,7 @@ def login_page():
                     if not st.session_state.thread_id:
                         # This handles the case where a user exists but doesn't have a thread_id
                         thread_id = create_new_thread()
-                        users_collection.update_one(
+                        admin_users_collection.update_one(
                             {"username": username}, {"$set": {"thread_id": thread_id}}
                         )
                         st.session_state.thread_id = thread_id

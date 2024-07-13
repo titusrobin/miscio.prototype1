@@ -5,12 +5,14 @@ from utils import (
     openai_client,
     campaigns_collection,
     students_collection,
+    student_chats_collection,
     send_student_message,
+    save_student_message
 )
+from bson import ObjectId
 
 # Create a Flask app
 app = Flask(__name__)
-
 
 @app.route("/")
 def home():
@@ -18,39 +20,45 @@ def home():
     return "Home"
 
 @app.route("/webhook", methods=["POST"])
-
-# Webhook endpoint: Receiver
 def webhook():
     incoming_msg = request.values.get("Body", "").lower()
     sender = request.values.get("From")
 
     student = students_collection.find_one(
-        {"phone_number": sender.replace("whatsapp:", "")}
+        {"phone": sender.replace("whatsapp:", "")}
     )
     if not student:
         return "Student not found", 400
 
-    active_campaign = campaigns_collection.find_one(
-        {"status": "active", "threads.student_id": student["_id"]}
-    )
-    if not active_campaign:
-        return "No active campaign found", 400
+    student_chat = student_chats_collection.find_one({"student_id": student["_id"]})
+    if not student_chat:
+        # Create a new chat history for this student
+        thread = openai_client.beta.threads.create()
+        student_chat = {
+            "student_id": student["_id"],
+            "thread_id": thread.id,
+            "messages": []
+        }
+        student_chats_collection.insert_one(student_chat)
 
-    thread_info = next(
-        thread
-        for thread in active_campaign["threads"]
-        if thread["student_id"] == student["_id"]
-    )
-    thread_id = thread_info["thread_id"]
+    active_campaign = campaigns_collection.find_one({"status": "active"})
+    if not active_campaign:
+        return "No active campaign found", 402
+
+    thread_id = student_chat["thread_id"]
+    campaign_id = active_campaign["_id"]
+    assistant_id = active_campaign["student_assistant_id"]
 
     print(f"Creating message in thread {thread_id}")
     openai_client.beta.threads.messages.create(
         thread_id=thread_id, role="user", content=incoming_msg
     )
 
-    print(f"Creating run with assistant {active_campaign['student_assistant_id']}")
+    save_student_message(student["_id"], "user", incoming_msg)
+
+    print(f"Creating run with assistant {assistant_id}")
     run = openai_client.beta.threads.runs.create(
-        thread_id=thread_id, assistant_id=active_campaign["student_assistant_id"]
+        thread_id=thread_id, assistant_id=assistant_id
     )
 
     print(f"Retrieving run {run.id}")
@@ -67,11 +75,12 @@ def webhook():
         msg.content[0].text.value for msg in messages.data if msg.role == "assistant"
     )
 
+    save_student_message(student["_id"], "assistant", assistant_message)
+
     print(f"Sending message: {assistant_message}")
     send_student_message(sender, assistant_message)
 
     return str(MessagingResponse())
-
 
 if __name__ == "__main__":
     app.run(debug=True, port=5003)
