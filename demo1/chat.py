@@ -100,7 +100,7 @@ def chat_interface():
             response = get_openai_response(prompt)
             st.markdown(response)
 
-        # Add messages to chat history (but don't save to database here)
+        # Add messages to chat history displayed
         st.session_state.messages.extend([
             {"role": "user", "message": prompt},
             {"role": "assistant", "message": response}

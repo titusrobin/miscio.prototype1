@@ -1,16 +1,16 @@
 # Import Dependencies
-import os
-import streamlit as st
+import os, re, streamlit as st, json, time
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from twilio.rest import Client as TwilioClient
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # OpenAI connection
 load_dotenv()
 OpenAI.api_key = os.getenv("OPENAI_API_KEY")
+
 openai_client = OpenAI()
 
 # Image file paths
@@ -179,7 +179,7 @@ def save_admin_message(thread_id, role, message):
         upsert=True,
     )
 
-def get_openai_response(message):
+def get_openai_response(message, max_retries=3, retry_delay=2):
     if "thread_id" not in st.session_state or not st.session_state.thread_id:
         thread = openai_client.beta.threads.create()
         st.session_state.thread_id = thread.id
@@ -188,51 +188,125 @@ def get_openai_response(message):
             {"$set": {"thread_id": st.session_state.thread_id}},
         )
 
-    openai_client.beta.threads.messages.create(
-        thread_id=st.session_state.thread_id, role="user", content=message
-    )
+    for attempt in range(max_retries):
+        try:
+            # Check for any active runs and cancel them
+            runs = openai_client.beta.threads.runs.list(thread_id=st.session_state.thread_id)
+            for run in runs.data:
+                if run.status in ["in_progress", "queued", "requires_action"]:
+                    try:
+                        openai_client.beta.threads.runs.cancel(
+                            run_id=run.id,
+                            thread_id=st.session_state.thread_id
+                        )
+                        print(f"Cancelled run: {run.id}")
+                    except OpenAIError as e:
+                        print(f"Error cancelling run {run.id}: {str(e)}")
 
-    save_admin_message(st.session_state.thread_id, "user", message)
+            # Wait for a moment to ensure cancellation is processed
+            time.sleep(1)
 
-    run = openai_client.beta.threads.runs.create(
-        thread_id=st.session_state.thread_id,
-        assistant_id=os.getenv("OPENAI_ASSISTANT_ID"),
-        instructions=f"Please address the user as Miscio Admin. They are the admin to whom you are the assistant at Miscio. The user asked: {message}",
-    )
-    run = openai_client.beta.threads.runs.retrieve(
-        thread_id=st.session_state.thread_id, run_id=run.id
-    )
-
-    while run.status != "completed":
-        run = openai_client.beta.threads.runs.retrieve(
-            thread_id=st.session_state.thread_id, run_id=run.id
-        )
-        if run.status == "requires_action":
-            tool_calls = run.required_action.submit_tool_outputs.tool_calls
-            tool_outputs = []
-            for tool in tool_calls:
-                if tool.function.name == "run_campaign":
-                    campaign_description = message
-                    campaign_id, assistant_id = run_campaign(campaign_description)
-                    tool_outputs.append(
-                        {
-                            "tool_call_id": tool.id,
-                            "output": f"Campaign run successfully with campaign ID: {campaign_id} and assistant ID: {assistant_id}",
-                        }
-                    )
-            openai_client.beta.threads.runs.submit_tool_outputs(
-                thread_id=st.session_state.thread_id,
-                run_id=run.id,
-                tool_outputs=tool_outputs,
+            # Now create a new message
+            openai_client.beta.threads.messages.create(
+                thread_id=st.session_state.thread_id, role="user", content=message
             )
 
-    messages = openai_client.beta.threads.messages.list(
-        thread_id=st.session_state.thread_id
-    )
-    for msg in messages.data:
-        if msg.role == "assistant":
-            content = msg.content[0].text.value
-            save_admin_message(st.session_state.thread_id, "assistant", content)
-            return content
+            save_admin_message(st.session_state.thread_id, "user", message)
 
-    return "I'm sorry, I couldn't process your request at this time."
+            run = openai_client.beta.threads.runs.create(
+                thread_id=st.session_state.thread_id,
+                assistant_id=os.getenv("OPENAI_ASSISTANT_ID"),
+                instructions=f"Please address the user as Miscio Admin. They are the admin to whom you are the assistant at Miscio. The user asked: {message}",
+            )
+
+            while run.status != "completed":
+                run = openai_client.beta.threads.runs.retrieve(
+                    thread_id=st.session_state.thread_id, run_id=run.id
+                )
+                if run.status == "requires_action":
+                    tool_calls = run.required_action.submit_tool_outputs.tool_calls
+                    tool_outputs = []
+                    for tool in tool_calls:
+                        if tool.function.name == "run_campaign":
+                            args = json.loads(tool.function.arguments)
+                            campaign_description = args.get('campaign_description', message)
+                            campaign_type = args.get('campaign_type', 'generic')
+                            campaign_id, assistant_id = run_campaign(campaign_description)
+                            tool_outputs.append(
+                                {
+                                    "tool_call_id": tool.id,
+                                    "output": json.dumps({
+                                        "campaign_id": str(campaign_id),
+                                        "assistant_id": assistant_id,
+                                        "message": f"Campaign '{campaign_description}' of type '{campaign_type}' run successfully."
+                                    })
+                                }
+                            )
+                        elif tool.function.name == "query_student_chats":
+                            args = json.loads(tool.function.arguments)
+                            print(f"Calling query_student_chats with args: {args}")  # Debugging line
+                            query_results = query_student_chats(args['query'])
+                            print(f"query_student_chats returned: {query_results}")  # Debugging line
+                            tool_outputs.append({
+                                "tool_call_id": tool.id,
+                                "output": json.dumps(query_results, default=str)
+                            })
+                    if tool_outputs:
+                        openai_client.beta.threads.runs.submit_tool_outputs(
+                            thread_id=st.session_state.thread_id,
+                            run_id=run.id,
+                            tool_outputs=tool_outputs,
+                        )
+
+            messages = openai_client.beta.threads.messages.list(
+                thread_id=st.session_state.thread_id
+            )
+            for msg in messages.data:
+                if msg.role == "assistant":
+                    content = msg.content[0].text.value
+                    save_admin_message(st.session_state.thread_id, "assistant", content)
+                    return content
+
+            return "I'm sorry, I couldn't process your request at this time."
+
+        except OpenAIError as e:
+            print(f"Attempt {attempt + 1} failed: {str(e)}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+            else:
+                raise
+
+    return "I'm sorry, I encountered an error while processing your request. Please try again later."
+
+def query_student_chats(query):
+    print(f"Querying student chats with: {query}")  # Debugging line
+    
+    # Simplified query - just search for any matching text in messages
+    mongo_query = {
+        "messages.message": {"$regex": query, "$options": "i"}
+    }
+
+    # Perform the query
+    chats = list(student_chats_collection.find(mongo_query))
+
+    # Process and format the results
+    results = []
+    for chat in chats:
+        student = students_collection.find_one({"_id": chat["student_id"]})
+        student_name = f"{student['first_name']} {student['last_name']}"
+        
+        for message in chat["messages"]:
+            if re.search(query, message["message"], re.IGNORECASE):
+                campaign = campaigns_collection.find_one({"_id": message["campaign_id"]})
+                campaign_name = campaign["campaign_description"] if campaign else "Unknown Campaign"
+                
+                results.append({
+                    "student_name": student_name,
+                    "campaign": campaign_name,
+                    "role": message["role"],
+                    "message": message["message"],
+                    "timestamp": message["timestamp"]
+                })
+
+    print(f"Found {len(results)} matching messages")  # Debugging line
+    return results

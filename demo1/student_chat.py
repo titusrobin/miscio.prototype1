@@ -14,7 +14,7 @@ from bson import ObjectId
 # Create a Flask app
 app = Flask(__name__)
 
-@app.route("/")
+@app.route("/") #temp homepage 
 def home():
     """Home endpoint returning a simple message."""
     return "Home"
@@ -27,12 +27,12 @@ def webhook():
     student = students_collection.find_one(
         {"phone": sender.replace("whatsapp:", "")}
     )
-    if not student:
+    if not student: # Student must exist in database 
         return "Student not found", 400
 
     student_chat = student_chats_collection.find_one({"student_id": student["_id"]})
-    if not student_chat:
-        # Create a new chat history for this student
+    
+    if not student_chat: # Create a new chat history for this student
         thread = openai_client.beta.threads.create()
         student_chat = {
             "student_id": student["_id"],

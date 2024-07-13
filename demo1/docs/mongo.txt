@@ -12,11 +12,14 @@ B. Chat collection (DOES THIS NEEDS TO CHANGE TO ADMIN CHAT?)
 
 ### Admin's perspective:
 - My user account information is saved
-- My chat history with my assistant is saved (OPENAI HOSTS HISTORY - LOC EG)
-- Student campaigns I run need to be stored individually 
-- I want access to student chat history
+- My chat history with my assistant is saved (Contextualization) 
 
->> 
+- Student campaigns I run need to be stored individually 
+
+>>> I want access to student chat history by campaign details / Updated assistant, Multiple func calling setup might be different from single func calling
+>>> Initial Conversation is dynamic based on student history 
+
+
 
 
 
