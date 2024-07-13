@@ -1,0 +1,49 @@
+Current History Managment 
+
+A. User collection
+- Each user has a unique document in collection. 
+- Each user gets their own thread id. 
+
+B. Chat collection (DOES THIS NEEDS TO CHANGE TO ADMIN CHAT?)
+- Stores thread_id and chat message by assistant/user. 
+
+
+
+
+### Admin's perspective:
+- My user account information is saved
+- My chat history with my assistant is saved (Contextualization) 
+
+- Student campaigns I run need to be stored individually 
+
+>>> I want access to student chat history by campaign details / Updated assistant, Multiple func calling setup might be different from single func calling
+>>> Initial Conversation is dynamic based on student history 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+----
+utils setup:
+- Setting up client, connecting db and collection. 
+- Save thread function to store in chat_collection 
+- Retreive function also setup there
+
+Login setup: 
+- The upsert=True option means that if the document does not exist, it will be created.

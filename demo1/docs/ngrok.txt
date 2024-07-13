@@ -1,0 +1,3 @@
+ngrok diagnose command
+expose
+vscode ports 

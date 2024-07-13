@@ -1,100 +1,110 @@
-# Dependencies, functions
+# Dependencies
 import streamlit as st
-import openai
-from datetime import datetime
-from utils import assistant, save_message, get_chathistory
-from utils import openai_client as client
+import base64
+from utils import (
+    save_admin_message,
+    get_admin_chathistory,
+    get_openai_response,
+    chat_logo,
+    icon,
+    user_avatar,
+    assistant_avatar,
+)
 
-def get_response(message):
-    # Create a thread if it doesn't exist for the user
-    if "thread_id" not in st.session_state:
-        thread = client.beta.threads.create()
-        st.session_state.thread_id = thread.id
-
-    # Add user message to the thread
-    client.beta.threads.messages.create(
-        thread_id=st.session_state.thread_id, role="user", content=message
-    )
-
-    # Create a run and poll for its completion
-    run = client.beta.threads.runs.create_and_poll(
-        thread_id=st.session_state.thread_id,
-        assistant_id=assistant.id,
-        instructions=f"Please address the user as Miscio Admin. They are the admin to whom you are the assistant at Miscio. The user asked: {message}",
-    )
-
-    # If the run completes, list the messages added to the thread by the assistant
-    if run.status == "completed":
-        messages = client.beta.threads.messages.list(
-            thread_id=st.session_state.thread_id
-        )
-
-        # Extract the latest assistant message
-        for message in messages.data:
-            if message.role == "assistant":
-                content = message.content[0].text.value
-                return content
-
-    return "I'm sorry, I couldn't process your request at this time."
-
+# Loading images
+def img_to_base64(img_path):
+    with open(img_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode()
 
 def chat_interface():
-    # ... (greeting and chat history code)
+    try:
+        logo_base64 = img_to_base64(chat_logo)
+        icon_base64 = img_to_base64(icon)
+    except Exception as e:
+        st.error(f"Error loading images: {str(e)}")
+        logo_base64 = ""
+        icon_base64 = ""
 
-    # Input box
-    st.session_state.user_input = st.text_input("Type your message...", value=st.session_state.user_input if "user_input" in st.session_state else "")
+    # Custom CSS for header bar and chat container
+    st.markdown(
+        f"""
+        <style>
+        #root > div:nth-child(1) > div > div > div > div > section > div {{
+            padding-top: 0rem;
+        }}
+        .top-bar {{
+            position: fixed;
+            top: 45px;
+            left: 0;
+            right: 0;
+            height: 50px;
+            background-color: #ffffff;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }}
+        .logo {{
+            height: 40px;
+        }}
+        .upload-icon {{
+            height: 40px;
+            cursor: pointer;
+        }}
+        .chat-container {{
+            margin-top: 100px;  /* Adjusted to account for the fixed top bar */
+            padding-bottom: 100px;  /* Add some padding at the bottom */
+        }}
+        </style>
 
-    if st.button("Send"):
-        if st.session_state.user_input:  # Only process if there's input
-            response = get_response(st.session_state.user_input)
-            st.session_state.chat_history.append({"sender": "Admin", "message": st.session_state.user_input})
-            st.session_state.chat_history.append({"sender": "AI Agent", "message": response})
-            st.session_state.user_input = ""  # Clear the input field
-            st.experimental_rerun()  # Rerun the app to display the updated chat
+        <div class="top-bar">
+            <img src="data:image/png;base64,{logo_base64}" class="logo" alt="Logo">
+            <img src="data:image/png;base64,{icon_base64}" class="upload-icon" alt="Upload" onclick="document.getElementById('file-upload').click();">
+            <input type="file" id="file-upload" style="display: none;">
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    # ... (clear chat history button code)
+    # Initialize chat history
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
+    # Load chat history
+    if "thread_id" in st.session_state and st.session_state.thread_id:
+        chat_history = get_admin_chathistory(st.session_state.thread_id)
+        if chat_history:
+            st.session_state.messages = chat_history
 
-### Greeting + Chat History + Input Box
-def chat_interface():
-    hour = datetime.now().hour
+    # Display chat messages
+    with st.container():
+        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        for message in st.session_state.messages:  # Display all messages
+            with st.chat_message(
+                message["role"],
+                avatar=user_avatar if message["role"] == "user" else assistant_avatar,
+            ):
+                st.markdown(message["message"])
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    if 5 <= hour < 12:
-        greeting = "Good morning"
-    elif 12 <= hour < 17:
-        greeting = "Good afternoon"
-    elif 17 <= hour < 21:
-        greeting = "Good evening"
-    else:
-        greeting = "Good evening"
+    # Chat input
+    if prompt := st.chat_input("Type your message..."):
+        # Display user message
+        with st.chat_message("user", avatar=user_avatar):
+            st.markdown(prompt)
 
-    st.header(f"{greeting}, {st.session_state.username}!")
+        # Get and display assistant response
+        with st.chat_message("assistant", avatar=assistant_avatar):
+            response = get_openai_response(prompt)
+            st.markdown(response)
 
-    # Creating a list to save chat history in session state
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
+        # Add messages to chat history displayed
+        st.session_state.messages.extend([
+            {"role": "user", "message": prompt},
+            {"role": "assistant", "message": response}
+        ])
 
-    # Display chat history
-    for chat in st.session_state.chat_history:
-        st.write(f"**{chat['sender']}:** {chat['message']}")
-
-    # Input box
-    st.session_state.user_input = st.text_input("Type your message...", value=st.session_state.user_input if "user_input" in st.session_state else "")
-
-    if st.button("Send"):
-        if st.session_state.user_input:  # Only process if there's input
-            response = get_response(st.session_state.user_input)
-            st.session_state.chat_history.append({"sender": "Admin", "message": st.session_state.user_input})
-            st.session_state.chat_history.append({"sender": "AI Agent", "message": response})
-            st.session_state.user_input = ""  # Clear the input field
-            st.experimental_rerun()  # Rerun the app to display the updated chat
-
-
-    # Clear chat history button
-    if st.button("Clear Chat"):
-        st.session_state.chat_history = []
-        st.experimental_rerun()
-
-
-### Rewrite the script for the SVM and tagging systems we have setup
-# def chat_interface():
+if __name__ == "__main__":
+    chat_interface()
