@@ -172,10 +172,18 @@ def get_admin_chathistory(thread_id):
     chat_doc = admin_chats_collection.find_one({"thread_id": thread_id})
     return chat_doc["messages"] if chat_doc else []
 
-def save_admin_message(thread_id, role, message):
+def save_admin_message(thread_id, role, message, assistant_id=None):
+    message_data = {
+        "role": role,
+        "message": message,
+        "timestamp": datetime.utcnow()
+    }
+    if assistant_id and role == "assistant":
+        message_data["assistant_id"] = assistant_id
+
     admin_chats_collection.update_one(
         {"thread_id": thread_id},
-        {"$push": {"messages": {"role": role, "message": message}}},
+        {"$push": {"messages": message_data}},
         upsert=True,
     )
 
@@ -264,7 +272,9 @@ def get_openai_response(message, max_retries=3, retry_delay=2):
             for msg in messages.data:
                 if msg.role == "assistant":
                     content = msg.content[0].text.value
-                    save_admin_message(st.session_state.thread_id, "assistant", content)
+                    # Get the assistant ID from the message object
+                    assistant_id = msg.assistant_id
+                    save_admin_message(st.session_state.thread_id, "assistant", content, assistant_id=assistant_id)
                     return content
 
             return "I'm sorry, I couldn't process your request at this time."
