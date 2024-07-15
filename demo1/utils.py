@@ -252,12 +252,11 @@ def get_openai_response(message, max_retries=3, retry_delay=2):
                             )
                         elif tool.function.name == "query_student_chats":
                             args = json.loads(tool.function.arguments)
-                            print(f"Calling query_student_chats with args: {args}")  # Debugging line
-                            query_results = query_student_chats(args['query'])
-                            print(f"query_student_chats returned: {query_results}")  # Debugging line
+                            chat_history = query_student_chats(args['query'])
+                            analysis = analyze_chat_history(args['query'], chat_history)
                             tool_outputs.append({
                                 "tool_call_id": tool.id,
-                                "output": json.dumps(query_results, default=str)
+                                "output": json.dumps({"analysis": analysis})
                             })
                     if tool_outputs:
                         openai_client.beta.threads.runs.submit_tool_outputs(
@@ -288,35 +287,44 @@ def get_openai_response(message, max_retries=3, retry_delay=2):
 
     return "I'm sorry, I encountered an error while processing your request. Please try again later."
 
-def query_student_chats(query):
-    print(f"Querying student chats with: {query}")  # Debugging line
-    
-    # Simplified query - just search for any matching text in messages
-    mongo_query = {
-        "messages.message": {"$regex": query, "$options": "i"}
-    }
+def query_student_chats(query, limit=5):
+    pipeline = [
+        {"$sort": {"messages.timestamp": -1}},
+        {"$project": {
+            "student_id": 1,
+            "messages": {"$slice": ["$messages", limit]}
+        }}
+    ]
+    chats = list(student_chats_collection.aggregate(pipeline))
 
-    # Perform the query
-    chats = list(student_chats_collection.find(mongo_query))
-
-    # Process and format the results
     results = []
     for chat in chats:
         student = students_collection.find_one({"_id": chat["student_id"]})
         student_name = f"{student['first_name']} {student['last_name']}"
         
         for message in chat["messages"]:
-            if re.search(query, message["message"], re.IGNORECASE):
-                campaign = campaigns_collection.find_one({"_id": message["campaign_id"]})
-                campaign_name = campaign["campaign_description"] if campaign else "Unknown Campaign"
-                
-                results.append({
-                    "student_name": student_name,
-                    "campaign": campaign_name,
-                    "role": message["role"],
-                    "message": message["message"],
-                    "timestamp": message["timestamp"]
-                })
+            campaign = campaigns_collection.find_one({"_id": message["campaign_id"]})
+            campaign_name = campaign["campaign_description"] if campaign else "Unknown Campaign"
+            
+            results.append({
+                "student_name": student_name,
+                "campaign": campaign_name,
+                "role": message["role"],
+                "message": message["message"]
+                # Timestamp is not included here
+            })
 
-    print(f"Found {len(results)} matching messages")  # Debugging line
     return results
+
+def analyze_chat_history(query, chat_history):
+    analysis_prompt = f"Analyze the following student chat history based on this query: '{query}'\n\nChat History:\n{json.dumps(chat_history, indent=2)}"
+    
+    response = openai_client.chat.completions.create(
+        model="gpt-4-turbo",
+        messages=[
+            {"role": "system", "content": "You are an AI assistant analyzing student chat history."},
+            {"role": "user", "content": analysis_prompt}
+        ]
+    )
+    
+    return response.choices[0].message.content
