@@ -1,3 +1,4 @@
+echo '#!/bin/bash
 mkdir -p ~/.streamlit/
 
 echo "\
@@ -6,4 +7,6 @@ headless = true\n\
 port = $PORT\n\
 enableCORS = false\n\
 \n\
-" > ~/.streamlit/config.toml
+[theme]\n\
+backgroundColor = \"#FFFFFF\"\n\
+" > ~/.streamlit/config.toml' > setup.sh
