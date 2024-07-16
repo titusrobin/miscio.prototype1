@@ -1,5 +1,5 @@
 # Dependencies 
-from flask import Flask, request
+from flask import request
 from twilio.twiml.messaging_response import MessagingResponse
 from utils import (
     openai_client,
@@ -11,15 +11,6 @@ from utils import (
 )
 from bson import ObjectId
 
-# Create a Flask app
-app = Flask(__name__)
-
-@app.route("/") #temp homepage 
-def home():
-    """Home endpoint returning a simple message."""
-    return "Home"
-
-@app.route("/webhook", methods=["POST"])
 def webhook():
     incoming_msg = request.values.get("Body", "").lower()
     sender = request.values.get("From")
@@ -81,6 +72,3 @@ def webhook():
     send_student_message(sender, assistant_message)
 
     return str(MessagingResponse())
-
-if __name__ == "__main__":
-    app.run(debug=True, port=5003)

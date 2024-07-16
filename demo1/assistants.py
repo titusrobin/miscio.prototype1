@@ -1,10 +1,10 @@
 # Dependencies
 from openai import OpenAI
 import os
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv()
+#load_dotenv()
 OpenAI.api_key = os.getenv("OPENAI_API_KEY")
 openai_client = OpenAI()
 

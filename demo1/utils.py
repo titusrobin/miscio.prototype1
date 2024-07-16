@@ -1,24 +1,24 @@
 # Import Dependencies
 import os, re, streamlit as st, json, time
-from dotenv import load_dotenv
 from pymongo import MongoClient
 from twilio.rest import Client as TwilioClient
 from openai import OpenAI, OpenAIError
 from bson import ObjectId
 from datetime import datetime, timedelta
 
-# OpenAI connection
-load_dotenv()
-OpenAI.api_key = os.getenv("OPENAI_API_KEY")
+# Environment variable checks
+if not os.getenv("OPENAI_API_KEY") or not os.getenv("MONGO_URI") or not os.getenv("TWILIO_ACCOUNT_SID") or not os.getenv("TWILIO_AUTH_TOKEN"):
+    raise EnvironmentError("Missing required environment variables. Please check your configuration.")
 
-openai_client = OpenAI()
+# OpenAI connection
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Image file paths
-misio_logo = "/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/m3logo.jpg"
-chat_logo = "/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/misciologo.jpg"
-icon = "/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/a.jpg"
-assistant_avatar = "/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/miscio_agent.jpg"
-user_avatar = "/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/user_icon.jpg"
+misio_logo = "imgs/m3logo.jpg"
+chat_logo = "imgs/misciologo.jpg"
+icon = "imgs/a.jpg"
+assistant_avatar = "imgs/miscio_agent.jpg"
+user_avatar = "imgs/user_icon.jpg"
 
 # MongoDB connection
 mongo_client = MongoClient(os.getenv("MONGO_URI"))
