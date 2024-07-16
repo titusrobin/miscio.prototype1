@@ -8,7 +8,7 @@ import threading
 
 app = Flask(__name__)
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def home():
     return "Hello, World!"
 
