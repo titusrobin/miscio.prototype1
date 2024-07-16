@@ -67,3 +67,4 @@ print(f"Admin Assistant created with ID: {ADMIN_ASSISTANT_ID}")
 
 # Optionally, you can save this ID to an environment variable or a config file
 # for use in other parts of your application
+asst_4OXqNoKixKo7fCR4FUlGPmoQ
