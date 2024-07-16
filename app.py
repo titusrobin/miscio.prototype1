@@ -1,11 +1,16 @@
-import streamlit as st, os
-from flask import Flask, request
+import streamlit as st
+import os
+from flask import Flask
 from login import login_page
 from chat import chat_interface
 from student_chat import webhook
 import threading
 
 app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Hello, World!"
 
 @app.route("/webhook", methods=["POST"])
 def flask_webhook():
