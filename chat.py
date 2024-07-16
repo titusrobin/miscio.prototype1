@@ -34,7 +34,7 @@ def chat_interface():
         }}
         .top-bar {{
             position: fixed;
-            top: 45px;
+            top: 50px;
             left: 0;
             right: 0;
             height: 50px;
