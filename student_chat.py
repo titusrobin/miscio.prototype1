@@ -15,16 +15,16 @@ import sys
 import os
 
 # Configure logging
-logging.basicConfig(stream=sys.stdout, level=logging.INFO,
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 def webhook():
-    logger.info("Webhook function called")
+    logger.debug("Webhook function called")
     try:
         incoming_msg = request.values.get("Body", "").lower()
         sender = request.values.get("From")
-        logger.info(f"Received message: '{incoming_msg}' from {sender}")
+        logger.debug(f"Received message: '{incoming_msg}' from {sender}")
 
         student = students_collection.find_one(
             {"phone": sender.replace("whatsapp:", "")}
@@ -33,12 +33,12 @@ def webhook():
             logger.error(f"Student not found for phone: {sender}")
             return "Student not found", 400
 
-        logger.info(f"Student found: {student['_id']}")
+        logger.debug(f"Student found: {student['_id']}")
 
         student_chat = student_chats_collection.find_one({"student_id": student["_id"]})
         
         if not student_chat:
-            logger.info("Creating new chat history for student")
+            logger.debug("Creating new chat history for student")
             thread = openai_client.beta.threads.create()
             student_chat = {
                 "student_id": student["_id"],
@@ -56,27 +56,27 @@ def webhook():
         campaign_id = active_campaign["_id"]
         assistant_id = active_campaign["student_assistant_id"]
 
-        logger.info(f"Creating message in thread {thread_id}")
+        logger.debug(f"Creating message in thread {thread_id}")
         openai_client.beta.threads.messages.create(
             thread_id=thread_id, role="user", content=incoming_msg
         )
 
         save_student_message(student["_id"], "user", incoming_msg)
 
-        logger.info(f"Creating run with assistant {assistant_id}")
+        logger.debug(f"Creating run with assistant {assistant_id}")
         run = openai_client.beta.threads.runs.create(
             thread_id=thread_id, assistant_id=assistant_id
         )
 
-        logger.info(f"Retrieving run {run.id}")
+        logger.debug(f"Retrieving run {run.id}")
         run = openai_client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
         while run.status != "completed":
-            logger.info(f"Run {run.id} not completed, retrieving again")
+            logger.debug(f"Run {run.id} not completed, retrieving again")
             run = openai_client.beta.threads.runs.retrieve(
                 thread_id=thread_id, run_id=run.id
             )
 
-        logger.info(f"Listing messages in thread {thread_id}")
+        logger.debug(f"Listing messages in thread {thread_id}")
         messages = openai_client.beta.threads.messages.list(thread_id=thread_id)
         assistant_message = next(
             msg.content[0].text.value for msg in messages.data if msg.role == "assistant"
@@ -84,10 +84,10 @@ def webhook():
 
         save_student_message(student["_id"], "assistant", assistant_message)
 
-        logger.info(f"Sending message: {assistant_message}")
+        logger.debug(f"Sending message: {assistant_message}")
         send_student_message(sender, assistant_message)
 
-        logger.info("Webhook processing completed successfully")
+        logger.debug("Webhook processing completed successfully")
         return str(MessagingResponse())
 
     except Exception as e:
@@ -103,5 +103,11 @@ if __name__ == "__main__":
     def handle_webhook():
         return webhook()
 
-    port = int(os.environ.get("PORT", 5000))
+    @app.route("/test", methods=["GET"])
+    def test():
+        logger.info("Test route accessed")
+        return "Flask app is running!", 200
+
+    port = int(os.environ.get("PORT", 5002))
+    logger.info(f"Starting Flask app on port {port}")
     app.run(host="0.0.0.0", port=port)
