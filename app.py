@@ -1,8 +1,9 @@
 import streamlit as st
 import os
+from utils import assistant_avatar
 
 # Streamlit configuration
-st.set_page_config(page_title="Miscio Assistant", page_icon="🧊", layout="wide")
+st.set_page_config(page_title="Miscio Assistant", page_icon=assistant_avatar, layout="wide")
 
 # Custom CSS for white background
 st.markdown("""
