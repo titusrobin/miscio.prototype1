@@ -1,0 +1,7 @@
+streamlit
+flask
+openai
+pymongo
+twilio
+python-dotenv
+gunicorn

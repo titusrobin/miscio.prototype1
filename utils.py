@@ -1,24 +1,24 @@
 # Import Dependencies
 import os, re, streamlit as st, json, time
-from dotenv import load_dotenv
 from pymongo import MongoClient
 from twilio.rest import Client as TwilioClient
 from openai import OpenAI, OpenAIError
 from bson import ObjectId
 from datetime import datetime, timedelta
 
-# OpenAI connection
-load_dotenv()
-OpenAI.api_key = os.getenv("OPENAI_API_KEY")
+# Environment variable checks
+if not os.getenv("OPENAI_API_KEY") or not os.getenv("MONGO_URI") or not os.getenv("TWILIO_ACCOUNT_SID") or not os.getenv("TWILIO_AUTH_TOKEN"):
+    raise EnvironmentError("Missing required environment variables. Please check your configuration.")
 
-openai_client = OpenAI()
+# OpenAI connection
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Image file paths
-misio_logo = "/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/m3logo.jpg"
-chat_logo = "/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/misciologo.jpg"
-icon = "/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/a.jpg"
-assistant_avatar = "/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/miscio_agent.jpg"
-user_avatar = "/Users/robintitus/Desktop/Miscio/prototype1/demo1/imgs/user_icon.jpg"
+misio_logo = "imgs/m3logo.jpg"
+chat_logo = "imgs/misciologo.jpg"
+icon = "imgs/a.jpg"
+assistant_avatar = "imgs/miscio_agent.jpg"
+user_avatar = "imgs/user_icon.jpg"
 
 # MongoDB connection
 mongo_client = MongoClient(os.getenv("MONGO_URI"))
@@ -172,10 +172,18 @@ def get_admin_chathistory(thread_id):
     chat_doc = admin_chats_collection.find_one({"thread_id": thread_id})
     return chat_doc["messages"] if chat_doc else []
 
-def save_admin_message(thread_id, role, message):
+def save_admin_message(thread_id, role, message, assistant_id=None):
+    message_data = {
+        "role": role,
+        "message": message,
+        "timestamp": datetime.utcnow()
+    }
+    if assistant_id and role == "assistant":
+        message_data["assistant_id"] = assistant_id
+
     admin_chats_collection.update_one(
         {"thread_id": thread_id},
-        {"$push": {"messages": {"role": role, "message": message}}},
+        {"$push": {"messages": message_data}},
         upsert=True,
     )
 
@@ -244,12 +252,11 @@ def get_openai_response(message, max_retries=3, retry_delay=2):
                             )
                         elif tool.function.name == "query_student_chats":
                             args = json.loads(tool.function.arguments)
-                            print(f"Calling query_student_chats with args: {args}")  # Debugging line
-                            query_results = query_student_chats(args['query'])
-                            print(f"query_student_chats returned: {query_results}")  # Debugging line
+                            chat_history = query_student_chats(args['query'])
+                            analysis = analyze_chat_history(args['query'], chat_history)
                             tool_outputs.append({
                                 "tool_call_id": tool.id,
-                                "output": json.dumps(query_results, default=str)
+                                "output": json.dumps({"analysis": analysis})
                             })
                     if tool_outputs:
                         openai_client.beta.threads.runs.submit_tool_outputs(
@@ -264,7 +271,9 @@ def get_openai_response(message, max_retries=3, retry_delay=2):
             for msg in messages.data:
                 if msg.role == "assistant":
                     content = msg.content[0].text.value
-                    save_admin_message(st.session_state.thread_id, "assistant", content)
+                    # Get the assistant ID from the message object
+                    assistant_id = msg.assistant_id
+                    save_admin_message(st.session_state.thread_id, "assistant", content, assistant_id=assistant_id)
                     return content
 
             return "I'm sorry, I couldn't process your request at this time."
@@ -278,35 +287,44 @@ def get_openai_response(message, max_retries=3, retry_delay=2):
 
     return "I'm sorry, I encountered an error while processing your request. Please try again later."
 
-def query_student_chats(query):
-    print(f"Querying student chats with: {query}")  # Debugging line
-    
-    # Simplified query - just search for any matching text in messages
-    mongo_query = {
-        "messages.message": {"$regex": query, "$options": "i"}
-    }
+def query_student_chats(query, limit=5):
+    pipeline = [
+        {"$sort": {"messages.timestamp": -1}},
+        {"$project": {
+            "student_id": 1,
+            "messages": {"$slice": ["$messages", limit]}
+        }}
+    ]
+    chats = list(student_chats_collection.aggregate(pipeline))
 
-    # Perform the query
-    chats = list(student_chats_collection.find(mongo_query))
-
-    # Process and format the results
     results = []
     for chat in chats:
         student = students_collection.find_one({"_id": chat["student_id"]})
         student_name = f"{student['first_name']} {student['last_name']}"
         
         for message in chat["messages"]:
-            if re.search(query, message["message"], re.IGNORECASE):
-                campaign = campaigns_collection.find_one({"_id": message["campaign_id"]})
-                campaign_name = campaign["campaign_description"] if campaign else "Unknown Campaign"
-                
-                results.append({
-                    "student_name": student_name,
-                    "campaign": campaign_name,
-                    "role": message["role"],
-                    "message": message["message"],
-                    "timestamp": message["timestamp"]
-                })
+            campaign = campaigns_collection.find_one({"_id": message["campaign_id"]})
+            campaign_name = campaign["campaign_description"] if campaign else "Unknown Campaign"
+            
+            results.append({
+                "student_name": student_name,
+                "campaign": campaign_name,
+                "role": message["role"],
+                "message": message["message"]
+                # Timestamp is not included here
+            })
 
-    print(f"Found {len(results)} matching messages")  # Debugging line
     return results
+
+def analyze_chat_history(query, chat_history):
+    analysis_prompt = f"Analyze the following student chat history based on this query: '{query}'\n\nChat History:\n{json.dumps(chat_history, indent=2)}"
+    
+    response = openai_client.chat.completions.create(
+        model="gpt-4-turbo",
+        messages=[
+            {"role": "system", "content": "You are an AI assistant analyzing student chat history."},
+            {"role": "user", "content": analysis_prompt}
+        ]
+    )
+    
+    return response.choices[0].message.content
