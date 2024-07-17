@@ -1,2 +1,1 @@
-web: streamlit run --server.port $PORT app.py
-worker: python flask_app.py
+web: python flask_app.py
