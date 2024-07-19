@@ -166,7 +166,7 @@ def create_student_assistant(campaign_description):
     return assistant.id
 
 def authenticate_user(username, password):
-    return username == "admin" and password == "admin123//"
+    return (username == "admin" or username == "Admin") and password == "admin123//"
 
 def get_admin_chathistory(thread_id):
     chat_doc = admin_chats_collection.find_one({"thread_id": thread_id})

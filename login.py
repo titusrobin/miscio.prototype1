@@ -12,7 +12,7 @@ def login_page():
             "<h1 style='text-align: center;'>Welcome back</h1>", unsafe_allow_html=True
         )
 
-        username = st.text_input("Username")
+        username = st.text_input("Username").lower()
         password = st.text_input("Password", type="password")
 
         if st.button("Login", key="login_button"):
