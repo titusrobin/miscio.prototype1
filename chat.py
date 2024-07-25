@@ -98,9 +98,18 @@ def chat_interface():
         with st.chat_message("user", avatar=user_avatar):
             st.markdown(prompt)
         
-        # Get and display assistant response
+        # Display "Thinking..." message
+        thinking_message = st.empty()
+        with thinking_message.container():
+            with st.chat_message("assistant", avatar=assistant_avatar):
+                st.markdown("Thinking...")
+        
+        # Get assistant response
+        response = get_openai_response(prompt)
+        
+        # Remove "Thinking..." message and display actual response
+        thinking_message.empty()
         with st.chat_message("assistant", avatar=assistant_avatar):
-            response = get_openai_response(prompt)
             st.markdown(response)
         
         # Add assistant response to chat history
