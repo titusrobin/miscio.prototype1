@@ -4,9 +4,9 @@ from utils import create_new_thread, admin_users_collection, authenticate_user, 
 
 
 def login_page():
-    col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])  # Create 5 columns
+    col1, col2, col3 = st.columns([1, 1, 1])  # Create 5 columns
 
-    with col3:  # Use the middle column for content
+    with col2:  # Use the middle column for content
         st.image(misio_logo, width=50, use_column_width=True)
         st.markdown(
             "<h1 style='text-align: center;'>Welcome back</h1>", unsafe_allow_html=True
@@ -25,8 +25,7 @@ def login_page():
                 if not user:
                     thread_id = create_new_thread()
                     admin_users_collection.insert_one(
-                        {"username": username, "thread_id": thread_id}
-                    )  # Create a new thread per user
+                        {"username": username, "thread_id": thread_id})  
                     st.session_state.thread_id = thread_id
                 else:
                     st.session_state.thread_id = user.get("thread_id")

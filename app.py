@@ -20,7 +20,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Your existing code starts here
+# Logic
 from login import login_page
 from chat import chat_interface
 

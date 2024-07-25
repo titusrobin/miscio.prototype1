@@ -54,8 +54,8 @@ def chat_interface():
             cursor: pointer;
         }}
         .chat-container {{
-            margin-top: 100px;  /* Adjusted to account for the fixed top bar */
-            padding-bottom: 100px;  /* Add some padding at the bottom */
+            margin-top: 100px;
+            padding-bottom: 100px;
         }}
         </style>
 
@@ -71,17 +71,17 @@ def chat_interface():
     # Initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = []
-
-    # Load chat history
-    if "thread_id" in st.session_state and st.session_state.thread_id:
-        chat_history = get_admin_chathistory(st.session_state.thread_id)
-        if chat_history:
-            st.session_state.messages = chat_history
+        # Load chat history only if it's not already loaded
+        if "thread_id" in st.session_state and st.session_state.thread_id:
+            chat_history = get_admin_chathistory(st.session_state.thread_id)
+            if chat_history:
+                st.session_state.messages = chat_history
 
     # Display chat messages
-    with st.container():
+    chat_container = st.container()
+    with chat_container:
         st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-        for message in st.session_state.messages:  # Display all messages
+        for message in st.session_state.messages:
             with st.chat_message(
                 message["role"],
                 avatar=user_avatar if message["role"] == "user" else assistant_avatar,
@@ -91,20 +91,28 @@ def chat_interface():
 
     # Chat input
     if prompt := st.chat_input("Type your message..."):
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "message": prompt})
+        
         # Display user message
         with st.chat_message("user", avatar=user_avatar):
             st.markdown(prompt)
-
+        
         # Get and display assistant response
         with st.chat_message("assistant", avatar=assistant_avatar):
             response = get_openai_response(prompt)
             st.markdown(response)
+        
+        # Add assistant response to chat history
+        st.session_state.messages.append({"role": "assistant", "message": response})
+        
+        # Save messages to database
+        if "thread_id" in st.session_state:
+            save_admin_message(st.session_state.thread_id, "user", prompt)
+            save_admin_message(st.session_state.thread_id, "assistant", response)
 
-        # Add messages to chat history displayed
-        st.session_state.messages.extend([
-            {"role": "user", "message": prompt},
-            {"role": "assistant", "message": response}
-        ])
+        # Rerun to update the chat display
+        st.experimental_rerun()
 
 if __name__ == "__main__":
     chat_interface()

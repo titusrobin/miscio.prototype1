@@ -6,6 +6,11 @@ from openai import OpenAI, OpenAIError
 from bson import ObjectId
 from datetime import datetime, timedelta
 
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
 # Environment variable checks
 if not os.getenv("OPENAI_API_KEY") or not os.getenv("MONGO_URI") or not os.getenv("TWILIO_ACCOUNT_SID") or not os.getenv("TWILIO_AUTH_TOKEN"):
     raise EnvironmentError("Missing required environment variables. Please check your configuration.")
@@ -187,104 +192,94 @@ def save_admin_message(thread_id, role, message, assistant_id=None):
         upsert=True,
     )
 
-def get_openai_response(message, max_retries=3, retry_delay=2):
+def get_openai_response(message, max_retries=3, retry_delay=2, timeout=60):
+    print(f"Starting get_openai_response with message: {message}")
+    
     if "thread_id" not in st.session_state or not st.session_state.thread_id:
+        print("Creating new thread")
         thread = openai_client.beta.threads.create()
         st.session_state.thread_id = thread.id
         admin_users_collection.update_one(
             {"username": st.session_state.username},
             {"$set": {"thread_id": st.session_state.thread_id}},
         )
+        print(f"New thread created with ID: {st.session_state.thread_id}")
 
     for attempt in range(max_retries):
         try:
-            # Check for any active runs and cancel them
-            runs = openai_client.beta.threads.runs.list(thread_id=st.session_state.thread_id)
-            for run in runs.data:
-                if run.status in ["in_progress", "queued", "requires_action"]:
-                    try:
-                        openai_client.beta.threads.runs.cancel(
-                            run_id=run.id,
-                            thread_id=st.session_state.thread_id
-                        )
-                        print(f"Cancelled run: {run.id}")
-                    except OpenAIError as e:
-                        print(f"Error cancelling run {run.id}: {str(e)}")
-
-            # Wait for a moment to ensure cancellation is processed
-            time.sleep(1)
-
-            # Now create a new message
+            print(f"Attempt {attempt + 1} of {max_retries}")
+            
+            print("Creating new message")
             openai_client.beta.threads.messages.create(
-                thread_id=st.session_state.thread_id, role="user", content=message
+                thread_id=st.session_state.thread_id,
+                role="user",
+                content=message
             )
+            print("Message created successfully")
 
+            print("Saving admin message")
             save_admin_message(st.session_state.thread_id, "user", message)
+            print("Admin message saved")
 
+            print("Creating new run")
             run = openai_client.beta.threads.runs.create(
                 thread_id=st.session_state.thread_id,
                 assistant_id=os.getenv("OPENAI_ASSISTANT_ID"),
-                instructions=f"Please address the user as Miscio Admin. They are the admin to whom you are the assistant at Miscio. The user asked: {message}",
+                instructions="Please provide a brief response to the user's message."
             )
+            print(f"New run created with ID: {run.id}")
 
-            while run.status != "completed":
+            print("Monitoring run status")
+            start_time = time.time()
+            while True:
+                if time.time() - start_time > timeout:
+                    print(f"Run timed out after {timeout} seconds")
+                    break
+                
+                print(f"Checking status of run {run.id}")
                 run = openai_client.beta.threads.runs.retrieve(
-                    thread_id=st.session_state.thread_id, run_id=run.id
+                    thread_id=st.session_state.thread_id,
+                    run_id=run.id
                 )
-                if run.status == "requires_action":
-                    tool_calls = run.required_action.submit_tool_outputs.tool_calls
-                    tool_outputs = []
-                    for tool in tool_calls:
-                        if tool.function.name == "run_campaign":
-                            args = json.loads(tool.function.arguments)
-                            campaign_description = args.get('campaign_description', message)
-                            campaign_type = args.get('campaign_type', 'generic')
-                            campaign_id, assistant_id = run_campaign(campaign_description)
-                            tool_outputs.append(
-                                {
-                                    "tool_call_id": tool.id,
-                                    "output": json.dumps({
-                                        "campaign_id": str(campaign_id),
-                                        "assistant_id": assistant_id,
-                                        "message": f"Campaign '{campaign_description}' of type '{campaign_type}' run successfully."
-                                    })
-                                }
-                            )
-                        elif tool.function.name == "query_student_chats":
-                            args = json.loads(tool.function.arguments)
-                            chat_history = query_student_chats(args['query'])
-                            analysis = analyze_chat_history(args['query'], chat_history)
-                            tool_outputs.append({
-                                "tool_call_id": tool.id,
-                                "output": json.dumps({"analysis": analysis})
-                            })
-                    if tool_outputs:
-                        openai_client.beta.threads.runs.submit_tool_outputs(
-                            thread_id=st.session_state.thread_id,
-                            run_id=run.id,
-                            tool_outputs=tool_outputs,
-                        )
+                print(f"Current run status: {run.status}")
+                
+                if run.status == "completed":
+                    print("Run completed")
+                    break
+                elif run.status in ["failed", "cancelled", "expired"]:
+                    print(f"Run ended with status: {run.status}")
+                    if hasattr(run, 'last_error') and run.last_error:
+                        print(f"Error details: {run.last_error}")
+                    break
+                
+                print("Waiting before next status check")
+                time.sleep(1)
 
+            print("Retrieving messages")
             messages = openai_client.beta.threads.messages.list(
                 thread_id=st.session_state.thread_id
             )
             for msg in messages.data:
                 if msg.role == "assistant":
                     content = msg.content[0].text.value
-                    # Get the assistant ID from the message object
                     assistant_id = msg.assistant_id
+                    print(f"Assistant message found: {content[:50]}...")
                     save_admin_message(st.session_state.thread_id, "assistant", content, assistant_id=assistant_id)
                     return content
 
+            print("No assistant message found")
             return "I'm sorry, I couldn't process your request at this time."
 
         except OpenAIError as e:
-            print(f"Attempt {attempt + 1} failed: {str(e)}")
+            print(f"OpenAI Error in attempt {attempt + 1}: {str(e)}")
             if attempt < max_retries - 1:
+                print(f"Retrying in {retry_delay} seconds")
                 time.sleep(retry_delay)
             else:
+                print("Max retries reached, raising error")
                 raise
 
+    print("All attempts failed")
     return "I'm sorry, I encountered an error while processing your request. Please try again later."
 
 def query_student_chats(query, limit=5):
