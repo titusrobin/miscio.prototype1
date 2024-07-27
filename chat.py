@@ -102,7 +102,7 @@ def chat_interface():
         thinking_message = st.empty()
         with thinking_message.container():
             with st.chat_message("assistant", avatar=assistant_avatar):
-                st.markdown("Thinking...")
+                st.markdown("Typing...")
         
         # Get assistant response
         response = get_openai_response(prompt)

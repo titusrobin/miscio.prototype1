@@ -120,10 +120,53 @@ def run_campaign(campaign_description):
     return campaign_id, assistant_id
 
 def send_initial_message(student, campaign_id, assistant_id, campaign_description):
-    message = f"Hello {student['first_name']}! This is a message from Miscio regarding the '{campaign_description}' campaign. You can now interact with our Student Assistant for any questions about this campaign."
-    
-    # First, ensure the student has a chat document
+    # Get student's chat history
     student_chat = student_chats_collection.find_one({"student_id": student["_id"]})
+    
+    # Check if student_chat exists and has messages
+    if student_chat and student_chat.get("messages"):
+        # Get the last 3 interactions
+        last_interactions = student_chat["messages"][-3:]
+        last_interactions_text = "\n".join([f"{msg['role']}: {msg['message']}" for msg in last_interactions])
+    else:
+        # If there's no chat history, set last_interactions_text to indicate this
+        last_interactions_text = "No previous interactions"
+
+    # Prepare context for OpenAI
+    context = {
+        "student_name": student['first_name'],
+        "campaign_description": campaign_description,
+        "last_interactions": last_interactions_text
+    }
+    
+    # Generate dynamic message using OpenAI
+    prompt = f"""
+    Create a personalized text for a student named {context['student_name']} about a new campaign: "{context['campaign_description']}".
+    
+    Last interactions:
+    {context['last_interactions']}
+    
+    The message should:
+    1. Address the student by their first name
+    2. Don't explicitly mention the campaign, but hint at it as the purpose of your message 
+    3. If there are previous interactions, briefly acknowledge or reference them if relevant
+    4. If this is the first interaction, warmly welcome the student
+    5. Keep the message friendly and concise (less 1000 characters)
+    6. Don't add a signature or closing line. 
+    Most importantly, write as a casual text, not a formal email, or email. It needs to feel like a short and casual text. 
+    """
+    
+    response = openai_client.chat.completions.create(
+        model="gpt-4-turbo",
+        messages=[
+            {"role": "system", "content": "You are an AI school assistant creating personalized messages for students."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    
+    message = response.choices[0].message.content.strip()
+    
+    # If student_chat doesn't exist, create a new one
     if not student_chat:
         thread = openai_client.beta.threads.create()
         student_chat = {
@@ -133,7 +176,7 @@ def send_initial_message(student, campaign_id, assistant_id, campaign_descriptio
         }
         student_chats_collection.insert_one(student_chat)
     
-    # Save the initial message to the student's chat history
+    # Save the message to the student's chat history
     save_student_message(student["_id"], "assistant", message)
     
     # Send the message via Twilio
@@ -165,7 +208,7 @@ def send_student_message(to, body):
 def create_student_assistant(campaign_description):
     assistant = openai_client.beta.assistants.create(
         name=f"Student Assistant - {campaign_description}",
-        instructions=f"You are a student assistant for the '{campaign_description}' campaign. Answer student queries related to this campaign to the best of your ability. Keep your responses concise and friendly.",
+        instructions=f"You are an assistant to a school administrator. You chat and get information from students, even feedback on behalf of the school admin. Keep your messages concise(within 1000 characters) and friendly.",
         model="gpt-4-turbo",
     )
     return assistant.id
@@ -192,95 +235,106 @@ def save_admin_message(thread_id, role, message, assistant_id=None):
         upsert=True,
     )
 
-def get_openai_response(message, max_retries=3, retry_delay=2, timeout=60):
-    print(f"Starting get_openai_response with message: {message}")
-    
+def get_openai_response(message, max_retries=3, retry_delay=2):
     if "thread_id" not in st.session_state or not st.session_state.thread_id:
-        print("Creating new thread")
         thread = openai_client.beta.threads.create()
         st.session_state.thread_id = thread.id
         admin_users_collection.update_one(
             {"username": st.session_state.username},
             {"$set": {"thread_id": st.session_state.thread_id}},
         )
-        print(f"New thread created with ID: {st.session_state.thread_id}")
 
     for attempt in range(max_retries):
         try:
-            print(f"Attempt {attempt + 1} of {max_retries}")
-            
-            print("Creating new message")
+            # Check for any active runs and cancel them
+            runs = openai_client.beta.threads.runs.list(thread_id=st.session_state.thread_id)
+            for run in runs.data:
+                if run.status in ["in_progress", "queued", "requires_action"]:
+                    try:
+                        openai_client.beta.threads.runs.cancel(
+                            run_id=run.id,
+                            thread_id=st.session_state.thread_id
+                        )
+                        print(f"Cancelled run: {run.id}")
+                    except OpenAIError as e:
+                        print(f"Error cancelling run {run.id}: {str(e)}")
+
+            # Wait for a moment to ensure cancellation is processed
+            time.sleep(1)
+
+            # Now create a new message
             openai_client.beta.threads.messages.create(
-                thread_id=st.session_state.thread_id,
-                role="user",
-                content=message
+                thread_id=st.session_state.thread_id, role="user", content=message
             )
-            print("Message created successfully")
 
-            print("Saving admin message")
             save_admin_message(st.session_state.thread_id, "user", message)
-            print("Admin message saved")
 
-            print("Creating new run")
             run = openai_client.beta.threads.runs.create(
                 thread_id=st.session_state.thread_id,
                 assistant_id=os.getenv("OPENAI_ASSISTANT_ID"),
-                instructions="Please provide a brief response to the user's message."
+                instructions=f"Please address the user as Miscio Admin. They are the admin to whom you are the assistant at Miscio. The user asked: {message}",
             )
-            print(f"New run created with ID: {run.id}")
 
-            print("Monitoring run status")
-            start_time = time.time()
-            while True:
-                if time.time() - start_time > timeout:
-                    print(f"Run timed out after {timeout} seconds")
-                    break
-                
-                print(f"Checking status of run {run.id}")
+            while run.status != "completed":
                 run = openai_client.beta.threads.runs.retrieve(
-                    thread_id=st.session_state.thread_id,
-                    run_id=run.id
+                    thread_id=st.session_state.thread_id, run_id=run.id
                 )
-                print(f"Current run status: {run.status}")
-                
-                if run.status == "completed":
-                    print("Run completed")
-                    break
-                elif run.status in ["failed", "cancelled", "expired"]:
-                    print(f"Run ended with status: {run.status}")
-                    if hasattr(run, 'last_error') and run.last_error:
-                        print(f"Error details: {run.last_error}")
-                    break
-                
-                print("Waiting before next status check")
-                time.sleep(1)
+                if run.status == "requires_action":
+                    tool_calls = run.required_action.submit_tool_outputs.tool_calls
+                    tool_outputs = []
+                    for tool in tool_calls:
+                        if tool.function.name == "run_campaign":
+                            args = json.loads(tool.function.arguments)
+                            campaign_description = args.get('campaign_description', message)
+                            campaign_type = args.get('campaign_type', 'generic')
+                            campaign_id, assistant_id = run_campaign(campaign_description)
+                            tool_outputs.append(
+                                {
+                                    "tool_call_id": tool.id,
+                                    "output": json.dumps({
+                                        "campaign_id": str(campaign_id),
+                                        "assistant_id": assistant_id,
+                                        "message": f"Campaign '{campaign_description}' of type '{campaign_type}' run successfully."
+                                    })
+                                }
+                            )
+                        elif tool.function.name == "query_student_chats":
+                            args = json.loads(tool.function.arguments)
+                            chat_history = query_student_chats(args['query'])
+                            analysis = analyze_chat_history(args['query'], chat_history)
+                            tool_outputs.append({
+                                "tool_call_id": tool.id,
+                                "output": json.dumps({"analysis": analysis})
+                            })
+                    if tool_outputs:
+                        openai_client.beta.threads.runs.submit_tool_outputs(
+                            thread_id=st.session_state.thread_id,
+                            run_id=run.id,
+                            tool_outputs=tool_outputs,
+                        )
 
-            print("Retrieving messages")
             messages = openai_client.beta.threads.messages.list(
                 thread_id=st.session_state.thread_id
             )
             for msg in messages.data:
                 if msg.role == "assistant":
                     content = msg.content[0].text.value
+                    # Get the assistant ID from the message object
                     assistant_id = msg.assistant_id
-                    print(f"Assistant message found: {content[:50]}...")
                     save_admin_message(st.session_state.thread_id, "assistant", content, assistant_id=assistant_id)
                     return content
 
-            print("No assistant message found")
             return "I'm sorry, I couldn't process your request at this time."
 
         except OpenAIError as e:
-            print(f"OpenAI Error in attempt {attempt + 1}: {str(e)}")
+            print(f"Attempt {attempt + 1} failed: {str(e)}")
             if attempt < max_retries - 1:
-                print(f"Retrying in {retry_delay} seconds")
                 time.sleep(retry_delay)
             else:
-                print("Max retries reached, raising error")
                 raise
 
-    print("All attempts failed")
     return "I'm sorry, I encountered an error while processing your request. Please try again later."
+
 
 def query_student_chats(query, limit=5):
     pipeline = [
