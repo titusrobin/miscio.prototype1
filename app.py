@@ -3,22 +3,9 @@ import os
 from utils import assistant_avatar
 
 # Streamlit configuration
-st.set_page_config(page_title="Miscio Assistant", page_icon=assistant_avatar, layout="wide")
-
-# Custom CSS for white background
-st.markdown("""
-    <style>
-    .reportview-container {
-        background: white;
-    }
-    .main {
-        background-color: white;
-    }
-    body {
-        color: black;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+st.set_page_config(
+    page_title="Miscio Assistant", page_icon=assistant_avatar, layout="wide"
+)
 
 # Logic
 from login import login_page
@@ -33,5 +20,6 @@ def main():
     else:
         login_page()
 
-if __name__ == "__main__":
+
+if __name__ == "__main__":  # When app.py is initiated as main script
     main()

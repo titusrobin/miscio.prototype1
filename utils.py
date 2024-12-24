@@ -1,3 +1,19 @@
+#Adding questions to campaigns collection, and turning other 
+# campaigns to inactive (what if they are still running though?) 
+
+#Adding questions to the student ai assistant instructions 
+
+#Create reponse flow based on answers received from the student, 
+# double checking assistant instructions 
+
+#Initial message: Take into account the context, but also the first question, contextually? 
+
+
+
+
+
+
+
 # Import Dependencies
 import os, re, streamlit as st, json, time
 from pymongo import MongoClient
@@ -24,6 +40,7 @@ chat_logo = "imgs/misciologo.jpg"
 icon = "imgs/a.jpg"
 assistant_avatar = "imgs/miscio_agent.jpg"
 user_avatar = "imgs/user_icon.jpg"
+left = "imgs/left.jpg"
 
 # MongoDB connection
 mongo_client = MongoClient(os.getenv("MONGO_URI"))
@@ -40,7 +57,7 @@ twilio_whatsapp_number = "whatsapp:+14155238886"
 
 # Util functions
 def create_new_thread():
-    thread = openai_client.beta.threads.create()
+    thread = openai_client.beta.threads.create() #TODO: beta 
     return thread.id
 
 def create_student(first_name, last_name, phone):
@@ -68,7 +85,7 @@ def create_campaign(campaign_description):
     )
     
     assistant_id = create_student_assistant(campaign_description)
-    campaign_id = campaigns_collection.insert_one({
+    campaign_id = campaigns_collection.insert_one({ #TODO what is campaign id for? 
         "campaign_description": campaign_description,
         "student_assistant_id": assistant_id,
         "status": "active",
@@ -115,13 +132,13 @@ def run_campaign(campaign_description):
     students = students_collection.find()
     
     for student in students:
-        send_initial_message(student, campaign_id, assistant_id, campaign_description)
+        send_initial_message(student, campaign_id, assistant_id, campaign_description) #TODO efficient? 
     
     return campaign_id, assistant_id
 
 def send_initial_message(student, campaign_id, assistant_id, campaign_description):
     # Get student's chat history
-    student_chat = student_chats_collection.find_one({"student_id": student["_id"]})
+    student_chat = student_chats_collection.find_one({"student_id": student["_id"]}) #TODO reaches all students? - Not class wise
     
     # Check if student_chat exists and has messages
     if student_chat and student_chat.get("messages"):
@@ -139,6 +156,8 @@ def send_initial_message(student, campaign_id, assistant_id, campaign_descriptio
         "last_interactions": last_interactions_text
     }
     
+    #TODO need always first name? 
+
     # Generate dynamic message using OpenAI
     prompt = f"""
     Create a personalized text for a student named {context['student_name']} about a new campaign: "{context['campaign_description']}".
@@ -147,7 +166,7 @@ def send_initial_message(student, campaign_id, assistant_id, campaign_descriptio
     {context['last_interactions']}
     
     The message should:
-    1. Address the student by their first name
+    1. Address the student by their first name 
     2. Don't explicitly mention the campaign, but hint at it as the purpose of your message 
     3. If there are previous interactions, briefly acknowledge or reference them if relevant
     4. If this is the first interaction, warmly welcome the student
@@ -231,25 +250,107 @@ def save_admin_message(thread_id, role, message, assistant_id=None):
 
     admin_chats_collection.update_one(
         {"thread_id": thread_id},
-        {"$push": {"messages": message_data}},
-        upsert=True,
+        {"$push": {"messages": message_data}}, #add to messages array 
+        upsert=True, #update or insert 
     )
 
-def get_openai_response(message, max_retries=3, retry_delay=2):
-    if "thread_id" not in st.session_state or not st.session_state.thread_id:
+# def get_openai_response(message, max_retries=3, retry_delay=0): #if api fails retry thrice 
+#     if "thread_id" not in st.session_state or not st.session_state.thread_id: #TODO need? 
+#         thread = openai_client.beta.threads.create()
+#         st.session_state.thread_id = thread.id
+#         admin_users_collection.update_one(
+#             {"username": st.session_state.username},
+#             {"$set": {"thread_id": st.session_state.thread_id}},
+#         )
+
+#     for attempt in range(max_retries):
+#         try:
+#             # Check for any active runs and cancel them
+#             runs = openai_client.beta.threads.runs.list(thread_id=st.session_state.thread_id) #get list of currrent runs 
+#             for run in runs.data:
+#                 if run.status in ["in_progress", "queued", "requires_action"]: #TODO: remove requires action?
+#                     try:
+#                         openai_client.beta.threads.runs.cancel(
+#                             run_id=run.id,
+#                             thread_id=st.session_state.thread_id
+#                         )
+#                         print(f"Cancelled run: {run.id}")
+#                     except OpenAIError as e:
+#                         print(f"Error cancelling run {run.id}: {str(e)}")
+
+#             # Wait for a moment to ensure cancellation is processed
+#             time.sleep(1)
+
+#             # Now create a new message
+#             openai_client.beta.threads.messages.create(
+#                 thread_id=st.session_state.thread_id, role="user", content=message
+#             )
+
+#             save_admin_message(st.session_state.thread_id, "user", message) #TODO need? 
+
+#             run = openai_client.beta.threads.runs.create(
+#                 thread_id=st.session_state.thread_id, #TODO takes care of history? 
+#                 assistant_id=os.getenv("OPENAI_ASSISTANT_ID"),
+#                 #TODO need instructions? What about creating assistants for unique admins? 
+#                 instructions=f"Please address the user as Miscio Admin. They are the admin to whom you are the assistant at Miscio. The user asked: {message}",
+#             )
+
+#             while run.status != "completed":
+#                 run = openai_client.beta.threads.runs.retrieve( #TODO need? 
+#                     thread_id=st.session_state.thread_id, run_id=run.id
+#                 )
+#                 if run.status == "requires_action":
+#                     tool_calls = run.required_action.submit_tool_outputs.tool_calls #actions or functions openai requires us to handle 
+#                     tool_outputs = []
+#                     for tool in tool_calls:
+#                         if tool.function.name == "run_campaign":
+#                             args = json.loads(tool.function.arguments) #args for our function 
+#                             campaign_description = args.get('campaign_description', message)
+#                             campaign_type = args.get('campaign_type', 'generic')
+#                             campaign_id, assistant_id = run_campaign(campaign_description) #call function 
+#                             tool_outputs.append(
+#                                 {
+#                                     "tool_call_id": tool.id,
+#                                     "output": json.dumps({
+#                                         "campaign_id": str(campaign_id),
+#                                         "assistant_id": assistant_id,
+#                                         "message": f"Campaign '{campaign_description}' of type '{campaign_type}' run successfully."
+#                                     })
+#                                 }
+#                             )
+#                         elif tool.function.name == "query_student_chats":
+#                             args = json.loads(tool.function.arguments)
+#                             chat_history = query_student_chats(args['query']) #TODO query by campaign id? 
+#                             analysis = analyze_chat_history(args['query'], chat_history)
+#                             tool_outputs.append({
+#                                 "tool_call_id": tool.id,
+#                                 "output": json.dumps({"analysis": analysis})
+#                             })
+#                     if tool_outputs:
+#                         openai_client.beta.threads.runs.submit_tool_outputs(
+#                             thread_id=st.session_state.thread_id,
+#                             run_id=run.id,
+#                             tool_outputs=tool_outputs,
+#                         )
+def get_openai_response(message, max_retries=3, retry_delay=0): #if api fails retry thrice 
+    if "thread_id" not in st.session_state or not st.session_state.thread_id: #TODO need? 
         thread = openai_client.beta.threads.create()
         st.session_state.thread_id = thread.id
+        print(f"Created new thread with ID: {thread.id}")
         admin_users_collection.update_one(
             {"username": st.session_state.username},
             {"$set": {"thread_id": st.session_state.thread_id}},
         )
+        print(f"Updated admin user with thread ID: {st.session_state.thread_id}")
 
     for attempt in range(max_retries):
         try:
+            print(f"Attempt {attempt + 1} of {max_retries}")
             # Check for any active runs and cancel them
-            runs = openai_client.beta.threads.runs.list(thread_id=st.session_state.thread_id)
+            runs = openai_client.beta.threads.runs.list(thread_id=st.session_state.thread_id) #get list of prev/currrent runs 
+            print(f"Retrieved runs: {runs.data}")
             for run in runs.data:
-                if run.status in ["in_progress", "queued", "requires_action"]:
+                if run.status in ["in_progress", "queued", "requires_action"]: #TODO: remove requires action?
                     try:
                         openai_client.beta.threads.runs.cancel(
                             run_id=run.id,
@@ -266,28 +367,37 @@ def get_openai_response(message, max_retries=3, retry_delay=2):
             openai_client.beta.threads.messages.create(
                 thread_id=st.session_state.thread_id, role="user", content=message
             )
+            print(f"Created new message in thread ID: {st.session_state.thread_id} with content: {message}")
 
-            save_admin_message(st.session_state.thread_id, "user", message)
+            save_admin_message(st.session_state.thread_id, "user", message) #TODO need? 
+            print(f"Saved admin message for thread ID: {st.session_state.thread_id}")
 
             run = openai_client.beta.threads.runs.create(
-                thread_id=st.session_state.thread_id,
+                thread_id=st.session_state.thread_id, #TODO takes care of history? 
                 assistant_id=os.getenv("OPENAI_ASSISTANT_ID"),
+                #TODO need instructions? What about creating assistants for unique admins? 
                 instructions=f"Please address the user as Miscio Admin. They are the admin to whom you are the assistant at Miscio. The user asked: {message}",
             )
+            print(f"Run with ID: {run.id} for thread ID: {st.session_state.thread_id}")
+            print(f"Created new run details: {run}")
 
             while run.status != "completed":
-                run = openai_client.beta.threads.runs.retrieve(
+                run = openai_client.beta.threads.runs.retrieve( #TODO need? 
                     thread_id=st.session_state.thread_id, run_id=run.id
                 )
+                print(f"Retrieved run status: {run.status}")
                 if run.status == "requires_action":
-                    tool_calls = run.required_action.submit_tool_outputs.tool_calls
+                    tool_calls = run.required_action.submit_tool_outputs.tool_calls #actions or functions openai requires us to handle 
+                    print(f"Tool calls requiring action: {tool_calls}")
                     tool_outputs = []
                     for tool in tool_calls:
                         if tool.function.name == "run_campaign":
-                            args = json.loads(tool.function.arguments)
+                            args = json.loads(tool.function.arguments) #args for our function 
+                            print(f"Arguments for run_campaign: {args}")
                             campaign_description = args.get('campaign_description', message)
                             campaign_type = args.get('campaign_type', 'generic')
-                            campaign_id, assistant_id = run_campaign(campaign_description)
+                            campaign_id, assistant_id = run_campaign(campaign_description) #call function 
+                            print(f"Ran campaign with ID: {campaign_id} and assistant ID: {assistant_id}")
                             tool_outputs.append(
                                 {
                                     "tool_call_id": tool.id,
@@ -298,10 +408,12 @@ def get_openai_response(message, max_retries=3, retry_delay=2):
                                     })
                                 }
                             )
-                        elif tool.function.name == "query_student_chats":
+                        elif tool.function.name == "query_student_chats": #TODO tool ouputs accurate to send back here? 
                             args = json.loads(tool.function.arguments)
-                            chat_history = query_student_chats(args['query'])
+                            print(f"Arguments for query_student_chats: {args}")
+                            chat_history = query_student_chats(args['query']) #TODO query by campaign id? 
                             analysis = analyze_chat_history(args['query'], chat_history)
+                            print(f"Analyzed chat history: {analysis}")
                             tool_outputs.append({
                                 "tool_call_id": tool.id,
                                 "output": json.dumps({"analysis": analysis})
@@ -312,6 +424,7 @@ def get_openai_response(message, max_retries=3, retry_delay=2):
                             run_id=run.id,
                             tool_outputs=tool_outputs,
                         )
+                        print(f"Submitted tool outputs: {tool_outputs}")
 
             messages = openai_client.beta.threads.messages.list(
                 thread_id=st.session_state.thread_id

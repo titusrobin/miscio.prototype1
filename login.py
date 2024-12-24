@@ -4,12 +4,12 @@ from utils import create_new_thread, admin_users_collection, authenticate_user, 
 
 
 def login_page():
-    col1, col2, col3 = st.columns([1, 1, 1])  # Create 5 columns
+    col1, col2, col3 = st.columns([1, 1, 1])  # Create 3 columns
 
     with col2:  # Use the middle column for content
         st.image(misio_logo, width=50, use_column_width=True)
         st.markdown(
-            "<h1 style='text-align: center;'>Welcome back</h1>", unsafe_allow_html=True
+            "<h1 style='text-align: center;'>Welcome back</h1>", unsafe_allow_html=True # sanitize later 
         )
 
         username = st.text_input("Username").lower()
@@ -20,7 +20,7 @@ def login_page():
                 st.session_state.logged_in = True
                 st.session_state.username = username
 
-                user = admin_users_collection.find_one({"username": username})
+                user = admin_users_collection.find_one({"username": username}) #dictionary returned if found
 
                 if not user:
                     thread_id = create_new_thread()
@@ -37,7 +37,7 @@ def login_page():
                         )
                         st.session_state.thread_id = thread_id
 
-                st.experimental_rerun()  # State history update and Loading
+                st.experimental_rerun()  # rerun app.py with uudates to go to chat interface 
             else:
                 st.error("Invalid credentials. Please try again.")
 

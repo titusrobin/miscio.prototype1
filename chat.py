@@ -18,7 +18,7 @@ def img_to_base64(img_path):
 
 def chat_interface():
     try:
-        logo_base64 = img_to_base64(chat_logo)
+        logo_base64 = img_to_base64(chat_logo) #embed image into html, css - text-based protocol 
         icon_base64 = img_to_base64(icon)
     except Exception as e:
         st.error(f"Error loading images: {str(e)}")
@@ -65,7 +65,7 @@ def chat_interface():
             <input type="file" id="file-upload" style="display: none;">
         </div>
         """,
-        unsafe_allow_html=True,
+        unsafe_allow_html=True, #TODO sanitize 
     )
 
     # Initialize chat history
@@ -73,21 +73,23 @@ def chat_interface():
         st.session_state.messages = []
         # Load chat history only if it's not already loaded
         if "thread_id" in st.session_state and st.session_state.thread_id:
-            chat_history = get_admin_chathistory(st.session_state.thread_id)
+            chat_history = get_admin_chathistory(st.session_state.thread_id) #list of dict of all msgs 
             if chat_history:
                 st.session_state.messages = chat_history
 
     # Display chat messages
-    chat_container = st.container()
+    chat_container = st.container() #group elements together using container 
     with chat_container:
         st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+
+        #load messages 
         for message in st.session_state.messages:
             with st.chat_message(
                 message["role"],
                 avatar=user_avatar if message["role"] == "user" else assistant_avatar,
             ):
                 st.markdown(message["message"])
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True) #TODO sanitize 
 
     # Chat input
     if prompt := st.chat_input("Type your message..."):
@@ -95,7 +97,7 @@ def chat_interface():
         st.session_state.messages.append({"role": "user", "message": prompt})
         
         # Display user message
-        with st.chat_message("user", avatar=user_avatar):
+        with st.chat_message("user", avatar=user_avatar): #TODO not dynamic 
             st.markdown(prompt)
         
         # Display "Thinking..." message
@@ -123,5 +125,5 @@ def chat_interface():
         # Rerun to update the chat display
         st.experimental_rerun()
 
-if __name__ == "__main__":
+if __name__ == "__main__": #TODO why do we need this?
     chat_interface()

@@ -30,7 +30,7 @@ def webhook():
             {"phone": sender.replace("whatsapp:", "")}
         )
         if not student:
-            logger.error(f"Student not found for phone: {sender}")
+            logger.error(f"Student not found for phone: {sender}") #TODO need? 
             return "Student not found", 400
 
         logger.debug(f"Student found: {student['_id']}")
@@ -47,7 +47,7 @@ def webhook():
             }
             student_chats_collection.insert_one(student_chat)
 
-        active_campaign = campaigns_collection.find_one({"status": "active"})
+        active_campaign = campaigns_collection.find_one({"status": "active"}) #TODO clarify conflict here 
         if not active_campaign:
             logger.error("No active campaign found")
             return "No active campaign found", 402
@@ -97,7 +97,7 @@ def webhook():
 if __name__ == "__main__":
     # This block is useful for local testing
     from flask import Flask
-    app = Flask(__name__)
+    app = Flask(__name__) #setting up a webserver to listen for requests - instance of Flask class
 
     @app.route("/webhook", methods=["POST"])
     def handle_webhook():
@@ -111,3 +111,5 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5002))
     logger.info(f"Starting Flask app on port {port}")
     app.run(host="0.0.0.0", port=port)
+
+    #TODO flask hashing for AUTH 
