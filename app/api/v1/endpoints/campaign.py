@@ -30,17 +30,46 @@ async def create_campaign(
 ):
     """
     Creates a new campaign with the provided configuration.
-    Only authenticated admin users can create campaigns.
+    Includes comprehensive error handling and logging.
     """
+    print(f"\n=== Starting Campaign Creation ===")
+    print(f"Campaign Description: {campaign.description}")
+    print(f"Admin ID: {current_admin.id}")
+    
     try:
-        return await campaign_service.create_campaign(
+        # Validate campaign data
+        if not campaign.description:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Campaign description is required"
+            )
+        
+        # Create campaign
+        print("\nInitiating campaign creation process...")
+        result = await campaign_service.create_campaign(
             campaign=campaign, 
             admin_id=current_admin.id
         )
+        
+        print(f"\n✓ Campaign created successfully")
+        print(f"Campaign ID: {result.get('id', 'N/A')}")
+        return result
+        
+    except HTTPException as http_ex:
+        # Re-raise HTTP exceptions directly
+        print(f"\n❌ HTTP Error: {http_ex.detail}")
+        raise
+        
     except Exception as e:
+        # Ensure we capture and log the full error details
+        error_message = str(e)
+        print(f"\n❌ Unexpected error in campaign creation:")
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error message: {error_message}")
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail=error_message or "An unexpected error occurred during campaign creation"
         )
 
 @router.get("/active", response_model=CampaignResponse)

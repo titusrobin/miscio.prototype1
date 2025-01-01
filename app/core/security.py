@@ -39,7 +39,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 async def get_current_admin_user(token: str = Depends(oauth2_scheme)) -> Admin:
     """
     Validates the JWT token and returns the current admin user.
-    This function is used as a dependency in protected endpoints.
+    This function transforms MongoDB's _id to our expected id format.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -62,7 +62,16 @@ async def get_current_admin_user(token: str = Depends(oauth2_scheme)) -> Admin:
         if admin is None:
             raise credentials_exception
             
-        return Admin(**admin)
+        # Transform MongoDB _id to id for our model
+        admin_dict = {
+            "id": str(admin["_id"]),  # Convert ObjectId to string
+            "username": admin["username"],
+            "email": admin["email"],
+            "is_active": admin.get("is_active", True),
+            "created_at": admin["created_at"]
+        }
+            
+        return Admin(**admin_dict)
     except JWTError:
         raise credentials_exception
 
